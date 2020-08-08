@@ -83,9 +83,8 @@ def precipitation():
     session = Session(engine)
 
     # Create a query to return the date and precipitation for the last year
-    results = session.query(Measurement.date, func.sum(Measurement.prcp)).\
-        filter(Measurement.date >= one_year).\
-        group_by(Measurement.date)
+    results = session.query(Measurement.date, Measurement.prcp).\
+        filter(Measurement.date >= one_year)
 
     # Close the session after we retreive the data
     session.close()
@@ -94,7 +93,7 @@ def precipitation():
     precipitation_list = []
     for date, prcp in results:
         precipitation_dict = {}
-        precipitation_dict[date] = round(prcp, 2)
+        precipitation_dict[date] = prcp
         precipitation_list.append(precipitation_dict)
 
     # jsonify the dictionary and return it
@@ -114,18 +113,13 @@ def stations():
     session = Session(engine)
 
     # Create a query to return all of the stations in the database
-    results = session.query(Station.station, Station.name)
+    results = session.query(Station.station)
 
     # Close the session after we retreive the data
     session.close()
 
     # Create a list from the row data
-    stations_list = []
-    for station, name in results:
-        station_dict = {}
-        station_dict["id"] = station
-        station_dict["name"] = name
-        stations_list.append(station_dict)
+    stations_list = [station[0] for station in results]
 
     # jsonify the list and return it
     return jsonify(stations_list)
@@ -195,22 +189,22 @@ def start_date(start):
         if search_date == cleaned_date:
 
             # Create a selection to pass into the query containing all search parameters
-            min_avg_max = [Measurement.date, func.min(Measurement.tobs), func.avg(Measurement.tobs), func.max(Measurement.tobs)]
+            min_avg_max = [func.min(Measurement.tobs), func.avg(Measurement.tobs), func.max(Measurement.tobs)]
 
             # Write out the query, unpack the selection from above, and filter for the start date
-            # groupby because we have multiple dates across all weather stations
             results = session.query(*min_avg_max).\
-                filter(Measurement.date >= cleaned_date).\
-                group_by(Measurement.date)
+                filter(Measurement.date >= cleaned_date)
             
             # Close the session after we retreive the data
             session.close()
 
             # Create a list of dictionaries to hold all the data and return it as a jsonified object
             temp_list = []
-            for date, min_temp, avg_temp, max_temp in results:
+            for min_temp, avg_temp, max_temp in results:
                 date_temps = {}
-                date_temps["date"] = date
+                #date_temps["date"] = date
+                date_temps["start date"] = cleaned_date
+                date_temps["end date"] = most_current[0]
                 date_temps["min temp"] = min_temp
                 date_temps["avg temp"] = round(avg_temp,2)
                 date_temps["max temp"] = max_temp
@@ -266,23 +260,22 @@ def end_date(start, end):
                 if end_date == cleaned_end_date:
 
                     # Create a selection to pass into the query containing all search parameters
-                    min_avg_max = [Measurement.date, func.min(Measurement.tobs), func.avg(Measurement.tobs), func.max(Measurement.tobs)]
+                    min_avg_max = [func.min(Measurement.tobs), func.avg(Measurement.tobs), func.max(Measurement.tobs)]
 
                     # Write out the query, unpack the selection from above, and filter for the start date
-                    # groupby because we have multiple dates across all weather stations
                     results = session.query(*min_avg_max).\
                         filter(Measurement.date >= cleaned_start_date).\
-                        filter(Measurement.date <= cleaned_end_date).\
-                        group_by(Measurement.date)
+                        filter(Measurement.date <= cleaned_end_date)
             
                     # Close the session after we retreive the data
                     session.close()
 
                     # Create a list of dictionaries to hold all the data and return it as a jsonified object
                     temp_list = []
-                    for date, min_temp, avg_temp, max_temp in results:
+                    for min_temp, avg_temp, max_temp in results:
                         date_temps = {}
-                        date_temps["date"] = date
+                        date_temps["start date"] = cleaned_start_date
+                        date_temps["end date"] = cleaned_end_date
                         date_temps["min temp"] = min_temp
                         date_temps["avg temp"] = round(avg_temp,2)
                         date_temps["max temp"] = max_temp
