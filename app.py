@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import create_engine, func
 
 import datetime as dt
+import dateutil.parser as dp
 
 from flask import Flask, jsonify
 
@@ -37,6 +38,9 @@ last_date = most_current[0].split('-')
 # Calculate the date 1 year ago by subtracting 365 days from the most current date
 one_year = dt.date(int(last_date[0]), int(last_date[1]), int(last_date[2])) - dt.timedelta(days=365)
 
+# Find the earliest date available
+oldest = session.query(func.min(Measurement.date)).first()
+
 # Close the session
 session.close()
 
@@ -58,11 +62,11 @@ def home():
     print("Server received request for 'Home' page...")
     return (
         f"<br><h3>Available Routes and Usage Instructions Below:</h3>"
-        f"<ul><li><strong>/api/v1.0/precipitation</strong> - List of Dates and Precipitation (inches) values.</li><br>"
+        f"<ul><li><strong>/api/v1.0/precipitation</strong> - List of Dates and Precipitation values (inches).</li><br>"
         f"<li><strong>/api/v1.0/stations</strong> - List of Stations.</li><br>"
-        f"<li><strong>/api/v1.0/tobs</strong> - List of Dates and Temperature (F) from the last year for the most active station</li><br>"
-        f"<li><strong>/api/v1.0/<code>&lt;start&gt;</code></strong> - List of minimum, average, and maximum Temperature (F) for all dates greater than and equal to the start date provided. <em>Date must be in the format YYYY-MM-DD</em></li><br>"
-        f"<li><strong>/api/v1.0/<code>&lt;start&gt;/&lt;end&gt;</code></strong> - List of minimum, average, and maximum Temperature (F) for dates between the start and end date provided (inclusive). <em>Date must be in the format YYYY-MM-DD</em></li>"
+        f"<li><strong>/api/v1.0/tobs</strong> - List of Dates and Temperature (F) from the last year for the most active station.</li><br>"
+        f"<li><strong>/api/v1.0/<code>&lt;start&gt;</code></strong> - List of minimum, average, and maximum Temperature (F) for all dates greater than and equal to the start date provided. <em>Date must be in the format YYYY-MM-DD and between {oldest[0]} and {most_current[0]}.</em></li><br>"
+        f"<li><strong>/api/v1.0/<code>&lt;start&gt;/&lt;end&gt;</code></strong> - List of minimum, average, and maximum Temperature (F) for dates between the start and end date provided (inclusive). <em>Date must be in the format YYYY-MM-DD and between {oldest[0]} and {most_current[0]}.</em></li>"
     )
 
 '''---------------'''
@@ -79,19 +83,22 @@ def precipitation():
     session = Session(engine)
 
     # Create a query to return the date and precipitation for the last year
-    results = session.query(Measurement.date, Measurement.prcp).\
-        filter(Measurement.date >= one_year).all()
+    results = session.query(Measurement.date, func.sum(Measurement.prcp)).\
+        filter(Measurement.date >= one_year).\
+        group_by(Measurement.date)
 
     # Close the session after we retreive the data
     session.close()
 
     # Create a dictionary from the row data
-    precipitation_dict = {}
+    precipitation_list = []
     for date, prcp in results:
-        precipitation_dict.update({date:prcp})
+        precipitation_dict = {}
+        precipitation_dict[date] = round(prcp, 2)
+        precipitation_list.append(precipitation_dict)
 
     # jsonify the dictionary and return it
-    return jsonify(precipitation_dict)
+    return jsonify(precipitation_list)
 
 '''----------'''
 ''' STATIONS '''
@@ -107,13 +114,18 @@ def stations():
     session = Session(engine)
 
     # Create a query to return all of the stations in the database
-    results = session.query(Station.station)
+    results = session.query(Station.station, Station.name)
 
     # Close the session after we retreive the data
     session.close()
 
     # Create a list from the row data
-    stations_list = [station[0] for station in results]
+    stations_list = []
+    for station, name in results:
+        station_dict = {}
+        station_dict["id"] = station
+        station_dict["name"] = name
+        stations_list.append(station_dict)
 
     # jsonify the list and return it
     return jsonify(stations_list)
@@ -137,16 +149,153 @@ def tobs():
         order_by(func.count(Measurement.station).desc()).all()
 
     # Create a query to return all of the dates and temperature observations during the last year in the database
-    results = session.query(Measurement.tobs).\
+    results = session.query(Measurement.date, Measurement.tobs).\
         filter(Measurement.station == active_stations[0][0]).\
         filter(Measurement.date >= one_year)
+    
+    # Close the session after we retreive the data
+    session.close()
 
-    tobs_list = [date_tobs[0] for date_tobs in results]
+    # Create a list from the row data
+    tobs_list = []
+    for date, tobs in results:
+        tobs_dict = {}
+        tobs_dict[date] = tobs
+        tobs_list.append(tobs_dict)
 
+    # jsonify the list and return it
     return jsonify(tobs_list)
+
+'''------------'''
+''' START DATE '''
+'''------------'''
+
+# Start Date page. Queries and displays a list of min, avg, and max temperatures for all dates greater than and equal to the start date.
+@app.route("/api/v1.0/<start>")
+def start_date(start):
+    # Message sent to the terminal to let developer know that a request to access the page was received
+    print("Server received request for 'Start Date' page...")
+
+    # The date util parser will automatically detect the date format entered then we convert it to YYYY-MM-DD
+    entered_date = dp.parse(start)
+    date_object = dt.datetime.strptime(str(entered_date), "%Y-%m-%d %H:%M:%S")
+    cleaned_date = date_object.strftime("%Y-%m-%d")
+    
+     # Create a session (link) from Python to the DB
+    session = Session(engine)
+
+    # First create a list of all the dates we have data for
+    search_start = session.query(Measurement.date)
+    search_list = [np.ravel(value) for value in search_start]
+  
+    # Loop through the data
+    for search_date in search_list:
+
+        # Check to see if the date the user is searching for exists in the data
+        if search_date == cleaned_date:
+
+            # Create a selection to pass into the query containing all search parameters
+            min_avg_max = [Measurement.date, func.min(Measurement.tobs), func.avg(Measurement.tobs), func.max(Measurement.tobs)]
+
+            # Write out the query, unpack the selection from above, and filter for the start date
+            # groupby because we have multiple dates across all weather stations
+            results = session.query(*min_avg_max).\
+                filter(Measurement.date >= cleaned_date).\
+                group_by(Measurement.date)
+            
+            # Close the session after we retreive the data
+            session.close()
+
+            # Create a list of dictionaries to hold all the data and return it as a jsonified object
+            temp_list = []
+            for date, min_temp, avg_temp, max_temp in results:
+                date_temps = {}
+                date_temps["date"] = date
+                date_temps["min temp"] = min_temp
+                date_temps["avg temp"] = round(avg_temp,2)
+                date_temps["max temp"] = max_temp
+                temp_list.append(date_temps)
+            
+            return jsonify(temp_list)
+
+    # If the date the user is searching for doesn't exist, respond with an error message
+    return jsonify({"error": "Start date not found within the database."}), 404
+        
+'''--------------------'''
+''' START and END DATE '''
+'''--------------------'''
+
+# Start and End Date page. Queries and displays a list of min, avg, and max temperatures for all dates between the start and end dates (inclusive).
+@app.route("/api/v1.0/<start>/<end>")
+def end_date(start, end):
+    # Message sent to the terminal to let developer know that a request to access the page was received
+    print("Server received request for 'Start and End Date' page...")
+
+    # The date util parser will automatically detect the date format entered then we convert it to YYYY-MM-DD
+    entered_start_date = dp.parse(start)
+    date_object = dt.datetime.strptime(str(entered_start_date), "%Y-%m-%d %H:%M:%S")
+    cleaned_start_date = date_object.strftime("%Y-%m-%d")
+
+    entered_end_date = dp.parse(end)
+    date_object = dt.datetime.strptime(str(entered_end_date), "%Y-%m-%d %H:%M:%S")
+    cleaned_end_date = date_object.strftime("%Y-%m-%d")
+
+    # If the user enters the end date first, correct it here
+    if cleaned_end_date < cleaned_start_date:
+        new_start = cleaned_end_date
+        new_end = cleaned_start_date
+        cleaned_end_date = new_end
+        cleaned_start_date = new_start
+
+     # Create a session (link) from Python to the DB
+    session = Session(engine)
+
+    # First create a list of all the dates we have data for
+    search = session.query(Measurement.date)
+    search_list = [np.ravel(value) for value in search]
+  
+    # Loop through the data
+    for start_date in search_list:
+
+        # Check to see if the start date the user is searching for exists in the data
+        if start_date == cleaned_start_date:
+
+            for end_date in search_list:
+
+
+                if end_date == cleaned_end_date:
+
+                    # Create a selection to pass into the query containing all search parameters
+                    min_avg_max = [Measurement.date, func.min(Measurement.tobs), func.avg(Measurement.tobs), func.max(Measurement.tobs)]
+
+                    # Write out the query, unpack the selection from above, and filter for the start date
+                    # groupby because we have multiple dates across all weather stations
+                    results = session.query(*min_avg_max).\
+                        filter(Measurement.date >= cleaned_start_date).\
+                        filter(Measurement.date <= cleaned_end_date).\
+                        group_by(Measurement.date)
+            
+                    # Close the session after we retreive the data
+                    session.close()
+
+                    # Create a list of dictionaries to hold all the data and return it as a jsonified object
+                    temp_list = []
+                    for date, min_temp, avg_temp, max_temp in results:
+                        date_temps = {}
+                        date_temps["date"] = date
+                        date_temps["min temp"] = min_temp
+                        date_temps["avg temp"] = round(avg_temp,2)
+                        date_temps["max temp"] = max_temp
+                        temp_list.append(date_temps)
+            
+                    return jsonify(temp_list)
+
+            # If the date the user is searching for doesn't exist, respond with an error message
+            return jsonify({"error": "End date not found within the database."}), 404
+
+    # If the date the user is searching for doesn't exist, respond with an error message
+    return jsonify({"error": "Start date not found within the database."}), 404
 
 # This code will allow the app to run and show debug errors
 if __name__ == "__main__":
     app.run(debug=True)
-
-
