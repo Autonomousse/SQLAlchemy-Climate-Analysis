@@ -89,12 +89,8 @@ def precipitation():
     # Close the session after we retreive the data
     session.close()
 
-    # Create a dictionary from the row data
-    precipitation_list = []
-    for date, prcp in results:
-        precipitation_dict = {}
-        precipitation_dict[date] = prcp
-        precipitation_list.append(precipitation_dict)
+    # Create a a list with a dictionary from the row data usint dictionary comprehension
+    precipitation_list = [{date:prcp for (date,prcp) in results}]
 
     # jsonify the dictionary and return it
     return jsonify(precipitation_list)
@@ -151,12 +147,8 @@ def tobs():
     session.close()
 
     # Create a list from the row data
-    tobs_list = []
-    for date, tobs in results:
-        tobs_dict = {}
-        tobs_dict[date] = tobs
-        tobs_list.append(tobs_dict)
-
+    tobs_list = [{date:tobs for (date,tobs) in results}]
+    
     # jsonify the list and return it
     return jsonify(tobs_list)
 
