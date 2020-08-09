@@ -65,7 +65,7 @@ def home():
         f"<ul><li><strong>/api/v1.0/precipitation</strong> - List of Dates and Precipitation values (inches).</li><br>"
         f"<li><strong>/api/v1.0/stations</strong> - List of Stations.</li><br>"
         f"<li><strong>/api/v1.0/tobs</strong> - List of Dates and Temperature (F) from the last year for the most active station.</li><br>"
-        f"<li><strong>/api/v1.0/<code>&lt;start&gt;</code></strong> - List of minimum, average, and maximum Temperature (F) for all dates greater than and equal to the start date provided. <em>Date must be in the format YYYY-MM-DD and between {oldest[0]} and {most_current[0]}.</em></li><br>"
+        f"<li><strong>/api/v1.0/<code>&lt;start&gt;</code></strong> - List of minimum, average, and maximum Temperature (F) for dates greater than and equal to the start date provided. <em>Date must be in the format YYYY-MM-DD and between {oldest[0]} and {most_current[0]}.</em></li><br>"
         f"<li><strong>/api/v1.0/<code>&lt;start&gt;/&lt;end&gt;</code></strong> - List of minimum, average, and maximum Temperature (F) for dates between the start and end date provided (inclusive). <em>Date must be in the format YYYY-MM-DD and between {oldest[0]} and {most_current[0]}.</em></li>"
     )
 
@@ -89,7 +89,7 @@ def precipitation():
     # Close the session after we retreive the data
     session.close()
 
-    # Create a a list with a dictionary from the row data usint dictionary comprehension
+    # Create a a list with a dictionary from the row data using dictionary comprehension
     precipitation_list = [{date:prcp for (date,prcp) in results}]
 
     # jsonify the dictionary and return it
@@ -146,7 +146,7 @@ def tobs():
     # Close the session after we retreive the data
     session.close()
 
-    # Create a list from the row data
+    # Create a a list with a dictionary from the row data using dictionary comprehension
     tobs_list = [{date:tobs for (date,tobs) in results}]
     
     # jsonify the list and return it
