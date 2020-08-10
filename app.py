@@ -84,13 +84,57 @@ def precipitation():
 
     # Create a query to return the date and precipitation for the last year
     results = session.query(Measurement.date, Measurement.prcp).\
-        filter(Measurement.date >= one_year)
+        filter(Measurement.date >= one_year).\
+            order_by(Measurement.date).all()
+
+    # Insert an extra fake day to the query to make sure we loop through and collect data for the last day below
+    one_more_day = (dt.datetime.strptime(most_current[0], '%Y-%m-%d') + dt.timedelta(days=1)).strftime('%Y-%m-%d')
+
+    # Append the fake day we created in a list with a fake prcp value
+    results.append([one_more_day,0.0])
 
     # Close the session after we retreive the data
     session.close()
 
     # Create a a list with a dictionary from the row data using dictionary comprehension
-    precipitation_list = [{date:prcp for (date,prcp) in results}]
+    #precipitation_list = [{date:prcp for (date,prcp) in results}]
+
+    # Create a list with dictionaries that have the date as the key and a list of values where the values are the prcp amounts from each station.
+    # The list is only for the last year of data. This method produces a cleaner output than a massive list.
+
+    # Create lists an a dictionary, format the starting date to string format
+    precipitation_list = []
+    value_list = []
+    rain_dict = {}
+    starting = one_year.strftime('%Y-%m-%d')
+
+    # Loop through the unpacked query results
+    for date, prcp in results: 
+
+        # If the current date is the same as the previous date, append the prcp amount to the list for the previous date      
+        if date == starting:
+            value_list.append(prcp)
+
+        # If the current date is different...
+        elif date != starting:
+
+            # create a dictionary with the date as the key and the list of prcp amounts as the value
+            rain_dict[starting] = value_list
+
+            # Add the dictionary to the list we will return
+            precipitation_list.append(rain_dict)
+
+            # Clear the list holding the prcp amounts so we can start adding the next dates prcp amounts to it
+            value_list = []
+
+            # Since we are on the next date already, we have to append the prcp amount before moving on
+            value_list.append(prcp)
+
+            # Set the starting date to be the current date
+            starting = date
+
+            # Create a new dictionary for the next date and prcp amounts key:value pair
+            rain_dict = {}
 
     # jsonify the dictionary and return it
     return jsonify(precipitation_list)
