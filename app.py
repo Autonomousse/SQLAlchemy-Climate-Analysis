@@ -41,6 +41,11 @@ one_year = dt.date(int(last_date[0]), int(last_date[1]), int(last_date[2])) - dt
 # Find the earliest date available
 oldest = session.query(func.min(Measurement.date)).first()
 
+# List the stations and the counts in descending order.
+active_stations = session.query(Measurement.station, func.count(Measurement.station)).\
+    group_by(Measurement.station).\
+    order_by(func.count(Measurement.station).desc()).all()
+
 # Close the session
 session.close()
 
@@ -62,9 +67,9 @@ def home():
     print("Server received request for 'Home' page...")
     return (
         f"<br><h3>Available Routes and Usage Instructions Below:</h3>"
-        f"<ul><li><strong>/api/v1.0/precipitation</strong> - List of Dates and Precipitation values (inches).</li><br>"
-        f"<li><strong>/api/v1.0/stations</strong> - List of Stations.</li><br>"
-        f"<li><strong>/api/v1.0/tobs</strong> - List of Dates and Temperature (F) from the last year for the most active station.</li><br>"
+        f"<ul><li><strong>/api/v1.0/precipitation</strong> - List of Dates and Precipitation values (inches) from every station available over the last year.</li><br>"
+        f"<li><strong>/api/v1.0/stations</strong> - List of Stations and their corresponding data.</li><br>"
+        f"<li><strong>/api/v1.0/tobs</strong> - List of Dates and Temperature (F) from the last year for the most active station (currently station: {active_stations[0][0]}).</li><br>"
         f"<li><strong>/api/v1.0/<code>&lt;start&gt;</code></strong> - List of minimum, average, and maximum Temperature (F) for dates greater than and equal to the start date provided. <em>Date must be in the format YYYY-MM-DD and between {oldest[0]} and {most_current[0]}.</em></li><br>"
         f"<li><strong>/api/v1.0/<code>&lt;start&gt;/&lt;end&gt;</code></strong> - List of minimum, average, and maximum Temperature (F) for dates between the start and end date provided (inclusive). <em>Date must be in the format YYYY-MM-DD and between {oldest[0]} and {most_current[0]}.</em></li>"
     )
@@ -153,13 +158,23 @@ def stations():
     session = Session(engine)
 
     # Create a query to return all of the stations in the database
-    results = session.query(Station.station)
+    results = session.query(Station.station, Station.name, Station.latitude, Station.longitude, Station.elevation)
 
     # Close the session after we retreive the data
     session.close()
 
     # Create a list from the row data
     stations_list = [station[0] for station in results]
+
+    stations_list =[]
+    for station, name, lat, lon, elevate in results:
+        stations_dict ={}
+        stations_dict["station id"] = station
+        stations_dict["station name"] = name
+        stations_dict["latitude"] = lat
+        stations_dict["longitude"] = lon
+        stations_dict["elevation"] = elevate
+        stations_list.append(stations_dict)
 
     # jsonify the list and return it
     return jsonify(stations_list)
@@ -176,11 +191,6 @@ def tobs():
 
      # Create a session (link) from Python to the DB
     session = Session(engine)
-
-    # List the stations and the counts in descending order.
-    active_stations = session.query(Measurement.station, func.count(Measurement.station)).\
-        group_by(Measurement.station).\
-        order_by(func.count(Measurement.station).desc()).all()
 
     # Create a query to return all of the dates and temperature observations during the last year in the database
     results = session.query(Measurement.date, Measurement.tobs).\
