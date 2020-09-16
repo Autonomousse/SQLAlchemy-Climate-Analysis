@@ -1,4 +1,4 @@
-# sqlalchemy-challenge - Surfs Up!
+# SQLAlchemy - Climate Analysis
 
 Congratulations! You've decided to treat yourself to a long holiday vacation in Honolulu, Hawaii! To help with your trip planning, you need to do some climate analysis on the area. The following outlines what you need to do.
 
@@ -6,7 +6,7 @@ Congratulations! You've decided to treat yourself to a long holiday vacation in 
 
 To begin, use Python and SQLAlchemy to do basic climate analysis and data exploration of your climate database. All of the following analysis should be completed using SQLAlchemy ORM queries, Pandas, and Matplotlib.
 
-* Use the provided climate_starter.ipynb and hawaii.sqlite files to complete your climate analysis and data exploration.
+* Use the provided [hawaii.sqlite](/Resources/hawaii.sqlite), [hawaii_measurements.csv](/Resources/hawaii_measurements.csv), and [hawaii_stations.csv](/Resources/hawaii_stations.csv) files to complete your climate analysis and data exploration.
 
 * Choose a start date and end date for your trip. Make sure that your vacation range is approximately 3-15 days total.
 
@@ -91,15 +91,13 @@ Now that you have completed your initial analysis, design a Flask API based on t
 
 ## Hints
 
-* You will need to join the station and measurement tables for some of the queries.
+* You may need to join the station and measurement tables for some of the queries.
 
 * Use Flask `jsonify` to convert your API data into a valid JSON response object.
 
 - - -
 
 ## Bonus: Other Recommended Analyses
-
-* The following are optional challenge queries. These are highly recommended to attempt, but not required for the homework.
 
 ### Temperature Analysis I
 
@@ -113,7 +111,7 @@ Now that you have completed your initial analysis, design a Flask API based on t
 
 ### Temperature Analysis II
 
-* The starter notebook contains a function called `calc_temps` that will accept a start date and end date in the format `%Y-%m-%d`. The function will return the minimum, average, and maximum temperatures for that range of dates.
+* The jupyter notebook contains a function called `calc_temps` that will accept a start date and end date in the format `%Y-%m-%d`. The function will return the minimum, average, and maximum temperatures for that range of dates.
 
 * Use the `calc_temps` function to calculate the min, avg, and max temperatures for your trip using the matching dates from the previous year (i.e., use "2017-01-01" if your trip start date was "2018-01-01").
 
